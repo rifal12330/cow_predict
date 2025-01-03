@@ -48,7 +48,7 @@ def index():
 def predict():
     try:
         # Ambil data dari request
-        input_data = request.json.get("input", [])
+        input_data = request.json.get("lebar dada & panjang badan", [])
         if not input_data or not isinstance(input_data, list):
             return jsonify({"error": "Input harus berupa array 2D"}), 400
 
