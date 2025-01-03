@@ -32,6 +32,9 @@ def get_db_connection():
 def index():
     return jsonify({"message": "Model backend is running"})
 
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
 @app.route("/predict", methods=["POST"])
 def predict():
     try:
