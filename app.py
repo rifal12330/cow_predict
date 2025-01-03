@@ -3,37 +3,46 @@ import numpy as np
 import joblib
 import os
 import pymysql
+import logging
 
 # Inisialisasi Flask
 app = Flask(__name__)
 
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+
 # Path model
 MODEL_PATH = "bnn1.pkl"
+if not os.path.exists(MODEL_PATH):
+    logging.error(f"Model file {MODEL_PATH} not found.")
+    raise FileNotFoundError(f"Model file {MODEL_PATH} not found.")
 model = joblib.load(MODEL_PATH)
 
 # Cloud SQL connection settings
-CLOUD_SQL_CONNECTION_NAME = "artful-mystery-441112-u2:asia-southeast2:db-cow-predict"  # Ganti dengan nama instance Cloud SQL Anda
-DB_USER = "rifal"  # Ganti dengan username MySQL Anda
-DB_PASSWORD = "12345678"  # Ganti dengan password MySQL Anda
-DB_NAME = "db-cow-predict"  # Ganti dengan nama database Anda
+CLOUD_SQL_CONNECTION_NAME = os.getenv("CLOUD_SQL_CONNECTION_NAME", "artful-mystery-441112-u2:asia-southeast2:db-cow-predict")
+DB_USER = os.getenv("DB_USER", "rifal")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "12345678")
+DB_NAME = os.getenv("DB_NAME", "db-cow-predict")
 
 # Fungsi untuk mendapatkan koneksi database menggunakan unix socket
 def get_db_connection():
-    unix_socket = f"/cloudsql/{CLOUD_SQL_CONNECTION_NAME}"
-    connection = pymysql.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        unix_socket=unix_socket
-    )
-    return connection
+    try:
+        # Cloud SQL instance connection string
+        unix_socket = f"/cloudsql/{CLOUD_SQL_CONNECTION_NAME}"
+        connection = pymysql.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            unix_socket=unix_socket  # This is the Cloud SQL socket connection
+        )
+        return connection
+    except pymysql.MySQLError as e:
+        logging.error(f"Error connecting to database: {e}")
+        raise e
 
 @app.route("/")
 def index():
     return jsonify({"message": "Model backend is running"})
-
-import logging
-logging.basicConfig(level=logging.DEBUG)
 
 @app.route("/predict", methods=["POST"])
 def predict():
@@ -51,7 +60,7 @@ def predict():
         bobot_real = request.json.get("bobot_real")
         suhu_badan = request.json.get("suhu_badan")
 
-        if None in (bobot_real, suhu_badan):
+        if bobot_real is None or suhu_badan is None:
             return jsonify({"error": "Semua parameter tambahan harus diisi"}), 400
 
         # Konversi ke numpy array
@@ -89,6 +98,7 @@ def predict():
         return jsonify(response)
 
     except Exception as e:
+        logging.error(f"Error in prediction: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
